@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube-like Live Chat with Likes</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f9f9f9;
+        }
+
+        #chat-container {
+            width: 100vw;
+            height: 100vh;
+            position: fixed;
+            right: 0;
+            top: 0;
+            background-color: #ffffff;
+            border-left: 1px solid #e0e0e0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #chat-header {
+            padding: 10px;
+            background-color: #f8f8f8;
+            border-bottom: 1px solid #e0e0e0;
+            font-weight: bold;
+        }
+
+        #comments {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .comment {
+            padding: 5px 0;
+            margin-bottom: 10px;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .like-button {
+            background: none;
+            border: none;
+            color: #657786;
+            cursor: pointer;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+
+        .like-button:hover {
+            color: #e0245e;
+        }
+
+        .like-button.liked {
+            color: #e0245e;
+        }
+
+        #chat-input {
+            border-top: 1px solid #e0e0e0;
+            padding: 10px;
+            display: flex;
+        }
+
+        #message-input {
+            flex-grow: 1;
+            border: 1px solid #d3d3d3;
+            border-radius: 18px;
+            padding: 8px 12px;
+            font-size: 14px;
+        }
+
+        #send-button {
+            background-color: #065fd4;
+            color: white;
+            border: none;
+            border-radius: 18px;
+            padding: 8px 16px;
+            margin-left: 8px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="chat-container">
+        <div id="chat-header">ライブ チャット</div>
+        <div id="comments"></div>
+        <div id="chat-input">
+            <input type="text" id="message-input" placeholder="メッセージを入力...">
+            <button id="send-button">送信</button>
+        </div>
+    </div>
+
+    <script>
+        const serverIP = window.location.hostname;
+        const ws = new WebSocket(`ws://${serverIP}:3000`);
+
+        ws.onopen = () => {
+            console.log("WebSocket connection opened");
+        };
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === "comment") {
+                addComment(data.comment);
+            }
+        };
+
+        ws.onclose = () => {
+            console.log("WebSocket connection closed");
+        };
+
+        ws.onerror = (error) => {
+            console.error("WebSocket error:", error);
+        };
+
+        function addComment(comment) {
+            const commentsDiv = document.getElementById("comments");
+            const commentDiv = document.createElement("div");
+            commentDiv.className = "comment";
+            commentDiv.innerHTML = `
+                ${comment}
+                <button class="like-button">👍 0</button>
+                <button class="bad-button">👎 0</button>
+            `;
+            commentsDiv.insertBefore(commentDiv, commentsDiv.firstChild);
+
+            const likeButton = commentDiv.querySelector('.like-button');
+            likeButton.addEventListener('click', function () {
+                let likes = parseInt(this.textContent.split(' ')[1]);
+                if (!this.classList.contains('liked')) {
+                    likes++;
+                    this.classList.add('liked');
+                } else {
+                    likes--;
+                    this.classList.remove('liked');
+                }
+                this.textContent = `👍 ${likes}`;
+            });
+        }
+
+        document.getElementById("send-button").addEventListener("click", sendMessage);
+        document.getElementById("message-input").addEventListener("keypress", function (event) {
+            if (event.key === "Enter") {
+                sendMessage();
+            }
+        });
+
+        function sendMessage() {
+            const input = document.getElementById("message-input");
+            const message = input.value.trim();
+            if (message) {
+                // ローカルで即座にコメントを表示
+                addComment(message);
+
+                // WebSocketを通じて他のクライアントにも送信
+                ws.send(JSON.stringify({ type: "comment", comment: message }));
+
+                input.value = "";
+            }
+        }
+    </script>
+</body>
+
+</html>
